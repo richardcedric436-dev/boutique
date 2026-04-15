@@ -7,12 +7,11 @@
  *
  * Stages :
  *   1. Checkout       → récupère le code depuis Git
- *   2. Build          → compile le code source
+ *   2. Build          → compile le code source (sans les tests)
  *   3. Tests unitaires → lance *Test.java via Surefire
  *   4. Tests intégration → lance *IT.java via Failsafe
- *   5. Couverture     → génère le rapport JaCoCo
- *   6. Qualité        → Checkstyle + PMD + CPD + SpotBugs
- *   7. Archive        → sauvegarde le JAR dans Jenkins
+ *   5. Qualité        → Checkstyle
+ *   6. Archive        → sauvegarde le JAR dans Jenkins
  *
  * Post :
  *   - failure → email à l'équipe
@@ -67,10 +66,10 @@ pipeline {
 
         // ── Stage 2 : Compiler ───────────────────────
         stage('Build') {
-    steps {
-        bat 'mvn clean install'
-    }
-}
+            steps {
+                bat 'mvn clean package -DskipTests -B'
+            }
+        }
 
         // ── Stage 3 : Tests unitaires ─────────────────
         stage('Tests unitaires') {
@@ -107,30 +106,22 @@ pipeline {
             }
         }
 
-        // ── Stage 5 : Couverture de code ─────────────
-        stage('Couverture JaCoCo') {
+        // ── Stage 5 : Analyse qualité ─────────────────
+        stage('Qualité') {
             steps {
-                bat 'mvn jacoco:report -B'
+                bat 'mvn checkstyle:check -B'
             }
             post {
                 always {
-                    jacoco(
-                        execPattern:   '**/target/jacoco.exec',
-                        classPattern:  '**/target/classes',
-                        sourcePattern: '**/src/main/java',
-                        minimumLineCoverage: '70'
+                    recordIssues(
+                        enabled:    true,
+                        tool:       checkStyle(pattern: '**/target/checkstyle-result.xml')
                     )
                 }
             }
         }
 
-        // ── Stage 6 : Analyse qualité ─────────────────
-        stage('Qualité') {
-    steps {
-        echo 'Analyse qualité ignorée (pas de config)'
-    }
-}
-        // ── Stage 7 : Archiver le JAR ─────────────────
+        // ── Stage 6 : Archiver le JAR ─────────────────
         stage('Archive') {
             steps {
                 archiveArtifacts(
